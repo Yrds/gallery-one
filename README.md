@@ -1,4 +1,4 @@
-# Gallery One 
+# Gallery One • ![GitHub](https://img.shields.io/github/license/yrds/gallery-one)
 
 Gallery One is a simple to use framework agnostic gallery component.
 
