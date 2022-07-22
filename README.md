@@ -1,5 +1,9 @@
 # Gallery One • ![GitHub](https://img.shields.io/github/license/yrds/gallery-one)
 
+<p align="center">
+  <img src="https://github.com/Yrds/gallery-one/blob/master/assets/logo_complete_transparent.png">
+</p>
+
 Gallery One is a simple to use framework agnostic gallery component.
 
 * **Simple to use:** Place some HTMLs and constructor the gallery object.
