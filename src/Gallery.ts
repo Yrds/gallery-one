@@ -1,6 +1,6 @@
 const assureBetween = (input: number, limit: number) : number => {
   if(input > limit) return limit;
-  if(input < limit) return -limit;
+  if(input < -limit) return -limit;
   return input;
 }
 
