@@ -1,8 +1,11 @@
+import { GalleryComponent } from './GalleryComponent';
+
 const assureBetween = (input: number, limit: number) : number => {
   if(input > limit) return limit;
   if(input < -limit) return -limit;
   return input;
 }
+
 
 interface ClientMove {
   x: number;
@@ -39,20 +42,27 @@ interface GalleryOptions {
 };
 
 export class Gallery {
+  private componentList: Array<GalleryComponent> = [];
   private defaultParent: HTMLElement;
-  private mainElement: HTMLElement;
+  private mainElement: Element;
   private selector: string;
   private slideSelected: number = 0;
   private slideContainers: NodeListOf<SlideContainerElement>;
-  private buttonNext?: HTMLDivElement;
-  private buttonPrev?: HTMLDivElement;
+  private buttonNext: HTMLDivElement | null;
+  private buttonPrev: HTMLDivElement | null;
 
-  constructor(selector: string, options: GalleryOptions) {
-    this.defaultParent = options.defaultParent || document.body;
+  constructor(selector: string, options?: GalleryOptions) {
+    this.defaultParent = (options && options.defaultParent ? options.defaultParent : undefined) || document.body;
 
     this.selector = selector;
 
-    this.mainElement = this.defaultParent.querySelector(this.selector);
+    const mainElement = this.defaultParent.querySelector(this.selector);
+
+    if(mainElement) {
+      this.mainElement = mainElement;
+    } else {
+      throw Error("No element with selector " + this.selector + " found on " + this.defaultParent);
+    }
 
     this.slideContainers = this.defaultParent.querySelectorAll(this.selector + " > .slide-container");
 
@@ -61,31 +71,48 @@ export class Gallery {
   }
 
   private setupElements() {
-    this.mainElement.classList.add('image-gallery');
+    if(this.mainElement) {
+      this.mainElement.classList.add('image-gallery');
+    }
+  }
+
+  public addComponent(component: GalleryComponent) {
+    this.componentList.push(component);
+    component.init(this);
   }
 
   private setupButtons() {
+    //TODO make this a component
     this.buttonNext = this.mainElement.querySelector('.slide-button-next');
-    this.buttonNext.addEventListener('click', () => {
-      this.nextSlide();
-    });
 
+    if(this.buttonNext) {
+      this.buttonNext.addEventListener('click', () => {
+        this.nextSlide();
+      });
+    }
+
+    //TODO make this a component
     this.buttonPrev = this.mainElement.querySelector('.slide-button-next');
-    this.buttonPrev.addEventListener('click', () => {
-      this.prevSlide();
-    });
 
+    if(this.buttonPrev) {
+      this.buttonPrev.addEventListener('click', () => {
+        this.prevSlide();
+      });
+    }
+
+    //TODO make this a component
     this.mainElement.addEventListener('dblclick', () => {
       this.zoomSlide();
     });
 
   }
 
-  private getTransformByElement(element: HTMLElement): TransformData {
-    const transformData = (element.querySelector('img') as SlideContainerImageElement).transformData;
+  private getTransformByElement(element: SlideContainerElement | undefined): TransformData {
 
-    if(transformData) {
-      return transformData;
+    const slideContainerImage = element ? (element.querySelector('img') as SlideContainerImageElement) : undefined;
+
+    if(slideContainerImage && slideContainerImage.transformData) {
+      return slideContainerImage.transformData;
     }
 
     return {
@@ -99,17 +126,19 @@ export class Gallery {
     return this.getTransformByElement(this.slideContainers[slideSelected]);
   }
 
-  private updateTransformByElement(transformData: TransformData, element: HTMLElement): void {
-    const slideContainerImage = (element.querySelector('img') as SlideContainerImageElement);
+  private updateTransformByElement(transformData: TransformData, element: HTMLElement | undefined): void {
+    const slideContainerImage = element ? (element.querySelector('img') as SlideContainerImageElement) : undefined;
 
-    slideContainerImage.transformData = transformData;
+    if(slideContainerImage) {
+      slideContainerImage.transformData = transformData;
 
-    let transformString: string = "";
-    transformString += "translate(" + transformData.position.x + "%, " + transformData.position.y + "%) ";
-    transformString += "rotate("+ transformData.rotation + "deg) ";
-    transformString += "scale("+ transformData.scale + ")";
+      let transformString: string = "";
+      transformString += "translate(" + transformData.position.x + "%, " + transformData.position.y + "%) ";
+      transformString += "rotate("+ transformData.rotation + "deg) ";
+      transformString += "scale("+ transformData.scale + ")";
 
-    slideContainerImage.style.transform = transformString;
+      slideContainerImage.style.transform = transformString;
+    }
   }
 
   updateTransformByIndex(transformData: TransformData, slideSelected: number): void {
@@ -120,11 +149,11 @@ export class Gallery {
     reverse?: boolean,
     selected?: number
   }) {
-    const reverse: boolean = params.reverse || false;
-    const selected: number | undefined = params.selected;
+    const reverse: boolean = params && params.reverse || false;
+    const selected: number | undefined = params ? params.selected : undefined;
 
     if(selected || selected == 0) {
-      this.slideSelected = Math.abs(params.selected % this.slideContainers.length);
+      this.slideSelected = Math.abs(selected % this.slideContainers.length);
     } else {
       this.slideSelected = (this.slideSelected + ( reverse ? -1 : 1) + this.slideContainers.length) % this.slideContainers.length;
     }
@@ -133,10 +162,13 @@ export class Gallery {
       container.classList.remove('container-selected');
     });
 
-    this.slideContainers[this.slideSelected].classList.add('container-selected');
+    const selectedSlide = this.slideContainers[this.slideSelected];
+
+    if(selectedSlide) {
+      selectedSlide.classList.add('container-selected');
+    }
 
     this.mainElement.dispatchEvent(createEvent('slideChangeEvent', { detail: {reverse, slideSelected: this.slideSelected}}));
-
   }
 
   public prevSlide() {
@@ -147,12 +179,14 @@ export class Gallery {
 
 
   private getClientMove(event: MouseEvent | TouchEvent): ClientMove {
-    const touch: {clientX: number, clientY: number} = (event.type === "TouchEvent") ? (event as TouchEvent).changedTouches[0] : {clientX: undefined, clientY: undefined};
+    const changedTouches = (event as TouchEvent).changedTouches[0];
 
-    const x = touch.clientX || (event as MouseEvent).clientX;
-    const y = touch.clientY || (event as MouseEvent).clientY;
-
-    return {x, y};
+    if(changedTouches) {
+      return { x: changedTouches.clientX, y: changedTouches.clientY };
+    } else {
+      const mouseEvent = (event as MouseEvent);
+      return {x: mouseEvent.clientX, y: mouseEvent.clientX};
+    }
   };
 
   private mouseDown(event: MouseEvent | TouchEvent): void {
@@ -161,7 +195,8 @@ export class Gallery {
 
     const container = event.currentTarget as SlideContainerElement;
 
-    const zoomActive: boolean = container.classList.contains('zoom-active');
+    //TODO
+    //const zoomActive: boolean = container.classList.contains('zoom-active');
 
     const transformData = this.getTransformByElement(container);
 
@@ -184,8 +219,8 @@ export class Gallery {
 
       const limitPosition: number = 100;
 
-      const newX = assureBetween(clientMove.x - container.dragPosition.x, 100);
-      const newY = assureBetween(clientMove.y - container.dragPosition.y, 100);
+      const newX = assureBetween(clientMove.x - container.dragPosition.x, limitPosition);
+      const newY = assureBetween(clientMove.y - container.dragPosition.y, limitPosition);
 
       transformData.position = {
         x: newX,
@@ -201,13 +236,19 @@ export class Gallery {
   private mouseUp(event: MouseEvent | TouchEvent) {
     const container = event.currentTarget as SlideContainerElement;
 
-    container.dragPosition = null;
+    if(container) {
+      container.dragPosition = undefined;
+    }
 
     event.preventDefault();
   }
 
   public zoomSlide() {
     const container = this.slideContainers[this.slideSelected];
+
+    if(!container){
+      throw Error("Container not selected. This should not happen, contact the developers.");
+    }
 
     const containerTransform = this.getTransformByElement(container);
 
